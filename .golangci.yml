@@ -1,0 +1,61 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: false
+
+linters:
+  default: "none"
+  enable:
+    - errcheck
+    - gosec
+    - misspell
+    - unconvert
+    - unparam
+
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*os.File).Close
+        - (os).RemoveAll
+        - (os).Remove
+        - (os).Setenv
+        - (os).Unsetenv
+        - (os).Chdir
+        - (os).MkdirAll
+        - (fmt).Sscanf
+    misspell:
+      locale: US
+
+  exclusions:
+    rules:
+      - path: '_test\.go'
+        linters:
+          - gosec
+        text: "G304|G306"
+      - linters:
+          - gosec
+        text: "G302.*0700|G301.*0750"
+      - path: 'cmd/tl/(comments|delete|doctor|import_jsonl|show)\.go|internal/(taskledger|git)/.*\.go|internal/storage/file/.*\.go'
+        linters:
+          - gosec
+        text: "G304"
+      - path: 'cmd/tl/init\.go|internal/git/worktree\.go|internal/storage/file/.*\.go'
+        linters:
+          - gosec
+        text: "G306"
+      - path: 'cmd/tl/show\.go|internal/git/worktree\.go'
+        linters:
+          - gosec
+        text: "G204"
+      - path: 'cmd/tl/show\.go'
+        linters:
+          - gosec
+        text: "G104.*Close"
+      - path: '_test\.go'
+        linters:
+          - errcheck
+        text: "Error return value of .*(Close|Rollback|RemoveAll|Setenv|Unsetenv|Chdir|MkdirAll|Remove|Write|SetReadDeadline|SetDeadline|Start|Stop).* is not checked"
+
+issues:
+  uniq-by-line: true

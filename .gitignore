@@ -1,0 +1,89 @@
+# Binaries
+/beads
+/tl
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+*.out
+/tl-test
+
+# Go workspace file
+go.work
+
+# Go build cache
+pkg/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local database artifacts from unrelated tools
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# task-ledger local lock and atomic-write temp files
+.task-ledger/.lock
+.task-ledger/issues/**/.issue.json.*.tmp
+
+# Ignore nix result
+result
+
+# direnv (machine-specific environment)
+.envrc
+
+# GoReleaser build artifacts
+dist/
+
+# Git worktrees
+.worktrees/
+tl-original
+mcp_agent_mail/
+tl-test
+tl-fixed
+.cursor/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.envrc
+
+# Performance profiling files (benchmarks, tl doctor --perf, and tl --profile)
+*.prof
+*.out
+beads-perf-*.prof
+bench-cpu-*.prof
+tl-profile-*.prof
+tl-trace-*.out
+# AI planning documents (ephemeral)
+history/
+
+# Orchestrator agent state
+state.json
+.task-ledger/redirect
+
+# Claude Code runtime
+.runtime/
+
+# Augment AI configuration (user-specific)
+.augment/
+.agents/
+output
