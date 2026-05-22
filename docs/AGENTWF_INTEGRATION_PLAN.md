@@ -77,7 +77,8 @@ tl ready --status open --unassigned --json
 ```
 
 The important contract is that worker pickup only starts from `status=open` and
-no assignee.
+no assignee. The orchestrator should run this command from the board repository
+root so directory-scoped label defaults do not hide ready work.
 
 ## Deferred Task Ledger Changes
 

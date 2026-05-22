@@ -51,7 +51,12 @@ var readyCmd = &cobra.Command{
 			IncludeDeferred: includeDeferred, // GH#820: respect --include-deferred flag
 		}
 		if status != "" {
-			filter.Status = types.Status(status)
+			readyStatus := types.Status(status)
+			if readyStatus != types.StatusOpen && readyStatus != types.StatusInProgress {
+				fmt.Fprintf(os.Stderr, "Error: ready --status only supports open or in_progress\n")
+				os.Exit(1)
+			}
+			filter.Status = readyStatus
 		}
 		// Use Changed() to properly handle P0 (priority=0)
 		if cmd.Flags().Changed("priority") {
@@ -168,7 +173,7 @@ func init() {
 	readyCmd.Flags().String(
 		"status",
 		"",
-		"Filter by status (open, in_progress, in_review, human_review, blocked, deferred, closed)",
+		"Filter by ready status (open, in_progress)",
 	)
 	readyCmd.Flags().IntP("priority", "p", 0, "Filter by priority")
 	readyCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")

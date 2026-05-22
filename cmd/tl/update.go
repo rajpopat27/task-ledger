@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"task-ledger/internal/hooks"
+	"task-ledger/internal/storage"
 	"task-ledger/internal/timeparsing"
 	"task-ledger/internal/types"
 	"task-ledger/internal/ui"
@@ -199,18 +200,24 @@ create, update, show, or close operation).`,
 
 			// Handle claim operation atomically
 			if claimFlag {
-				// Check if already claimed (has non-empty assignee)
-				if issue.Assignee != "" {
-					fmt.Fprintf(os.Stderr, "Error claiming %s: already claimed by %s\n", id, issue.Assignee)
-					hadError = true
-					continue
-				}
-				// Atomically set assignee and status
 				claimUpdates := map[string]interface{}{
 					"assignee": actor,
 					"status":   "in_progress",
 				}
-				if err := store.UpdateIssue(ctx, resolvedID, claimUpdates, actor); err != nil {
+				err := store.RunInTransaction(ctx, func(tx storage.Transaction) error {
+					latest, err := tx.GetIssue(ctx, resolvedID)
+					if err != nil {
+						return err
+					}
+					if latest == nil {
+						return fmt.Errorf("issue %s not found", resolvedID)
+					}
+					if latest.Assignee != "" {
+						return fmt.Errorf("already claimed by %s", latest.Assignee)
+					}
+					return tx.UpdateIssue(ctx, resolvedID, claimUpdates, actor)
+				})
+				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error claiming %s: %v\n", id, err)
 					hadError = true
 					continue

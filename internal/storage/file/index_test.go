@@ -683,6 +683,8 @@ func TestStatistics(t *testing.T) {
 		{Title: "Open 1", Status: types.StatusOpen, Priority: 1, IssueType: types.TypeTask},
 		{Title: "Open 2", Status: types.StatusOpen, Priority: 1, IssueType: types.TypeTask},
 		{Title: "In Progress", Status: types.StatusInProgress, Priority: 1, IssueType: types.TypeTask},
+		{Title: "In Review", Status: types.StatusInReview, Priority: 1, IssueType: types.TypeTask},
+		{Title: "Human Review", Status: types.StatusHumanReview, Priority: 1, IssueType: types.TypeTask},
 		{Title: "Closed", Status: types.StatusClosed, Priority: 1, IssueType: types.TypeTask, ClosedAt: func() *time.Time { t := time.Now(); return &t }()},
 	}
 
@@ -703,14 +705,20 @@ func TestStatistics(t *testing.T) {
 		t.Fatalf("GetStatistics failed: %v", err)
 	}
 
-	if stats.TotalIssues != 4 {
-		t.Errorf("Expected 4 total issues, got %d", stats.TotalIssues)
+	if stats.TotalIssues != 6 {
+		t.Errorf("Expected 6 total issues, got %d", stats.TotalIssues)
 	}
 	if stats.OpenIssues != 2 {
 		t.Errorf("Expected 2 open issues, got %d", stats.OpenIssues)
 	}
 	if stats.InProgressIssues != 1 {
 		t.Errorf("Expected 1 in-progress issue, got %d", stats.InProgressIssues)
+	}
+	if stats.InReviewIssues != 1 {
+		t.Errorf("Expected 1 in-review issue, got %d", stats.InReviewIssues)
+	}
+	if stats.HumanReviewIssues != 1 {
+		t.Errorf("Expected 1 human-review issue, got %d", stats.HumanReviewIssues)
 	}
 	if stats.ClosedIssues != 1 {
 		t.Errorf("Expected 1 closed issue, got %d", stats.ClosedIssues)

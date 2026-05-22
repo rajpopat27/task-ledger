@@ -703,9 +703,12 @@ func TestFileBackendReadyStatusFilter(t *testing.T) {
 	run("init", "--quiet")
 	openID := run("create", "task", "Open task", "--silent")
 	inProgressID := run("create", "task", "In progress task", "--silent")
+	claimedID := run("create", "task", "Claimed task", "--silent")
+	deferredID := run("create", "task", "Deferred task", "--defer", "+1h", "--silent")
 	run("update", inProgressID, "--status", "in_progress")
+	run("update", claimedID, "--assignee", "alice")
 
-	out := run("--json", "ready", "--status", "open", "--limit", "50")
+	out := run("--json", "ready", "--status", "open", "--unassigned", "--limit", "50")
 	var issues []map[string]interface{}
 	if err := json.Unmarshal([]byte(out), &issues); err != nil {
 		t.Fatalf("ready JSON did not parse: %v\n%s", err, out)
@@ -722,6 +725,51 @@ func TestFileBackendReadyStatusFilter(t *testing.T) {
 	}
 	if seen[inProgressID] {
 		t.Fatalf("ready --status open included in_progress issue %s: %#v", inProgressID, issues)
+	}
+	if seen[claimedID] {
+		t.Fatalf("ready --status open --unassigned included claimed issue %s: %#v", claimedID, issues)
+	}
+	if seen[deferredID] {
+		t.Fatalf("ready --status open --unassigned included deferred issue %s: %#v", deferredID, issues)
+	}
+
+	out = run("--json", "ready", "--status", "open", "--unassigned", "--include-deferred", "--limit", "50")
+	issues = nil
+	if err := json.Unmarshal([]byte(out), &issues); err != nil {
+		t.Fatalf("ready include-deferred JSON did not parse: %v\n%s", err, out)
+	}
+	seen = map[string]bool{}
+	for _, issue := range issues {
+		if id, ok := issue["id"].(string); ok {
+			seen[id] = true
+		}
+	}
+	if !seen[deferredID] {
+		t.Fatalf("ready --include-deferred did not include deferred issue %s: %#v", deferredID, issues)
+	}
+
+	out = runFileBackendTLError(t, tmpBin, repo, "ready", "--status", "closed")
+	requireOutputContains(t, out, "ready --status only supports open or in_progress")
+}
+
+func TestFileBackendRejectsInvalidStatus(t *testing.T) {
+	tmpBin := buildFileBackendBinary(t)
+	repo := t.TempDir()
+	run := func(args ...string) string {
+		t.Helper()
+		return runFileBackendTL(t, tmpBin, repo, args...)
+	}
+
+	run("init", "--quiet")
+	id := run("create", "task", "Invalid status task", "--silent")
+
+	out := runFileBackendTLError(t, tmpBin, repo, "update", id, "--status", "bogus")
+	requireOutputContains(t, out, "invalid status: bogus")
+
+	var issue map[string]interface{}
+	readIssueJSON(t, filepath.Join(repo, ".task-ledger", "issues", id, "issue.json"), &issue)
+	if issue["status"] != "open" {
+		t.Fatalf("invalid status update changed issue: %#v", issue)
 	}
 }
 

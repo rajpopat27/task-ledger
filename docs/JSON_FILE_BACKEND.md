@@ -183,7 +183,7 @@ Agents should interact through the CLI, not by editing JSON directly. Direct edi
 Recommended agent commands:
 
 ```bash
-tl ready --status open --json
+tl ready --status open --unassigned --json
 tl show <id> --json
 tl create task "Title" --parent <epic-id> --description "..." --json
 tl update <id> --status in_progress --json
