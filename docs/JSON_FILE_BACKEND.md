@@ -62,6 +62,10 @@ Each `issue.json` is stable formatted JSON:
   "estimated_minutes": 60,
   "description": "Validate card details before submit.",
   "comments": [],
+  "agentwf": {
+    "worker_agent_id": "coder",
+    "review_agent_ids": ["code-reviewer"]
+  },
   "created_at": "2026-05-01T10:00:00Z",
   "created_by": "raj",
   "updated_at": "2026-05-01T10:00:00Z",
@@ -83,6 +87,7 @@ Important fields:
 | `dependencies` | Full dependency records with dependency type and metadata. |
 | `labels` | Sorted label list. |
 | `comments` | Inline comments for the issue. |
+| `agentwf` | Optional extension object for local agent workflow metadata. Task Ledger preserves it but does not interpret it. |
 | `due_at`, `defer_until` | Optional scheduling timestamps. |
 | `deleted_at`, `deleted_by`, `delete_reason` | Tombstone metadata when imported or represented as deleted. |
 
@@ -110,7 +115,7 @@ Direct edits are supported for inspection and emergency repair, but files must r
 - `external_ref` values must be unique when present.
 - IDs may contain ASCII letters, digits, hyphen, underscore, and dot. They must not contain path separators or traversal segments.
 - `type` must be `feature_request`, `feature`, `epic`, `task`, `bug`, or `chore`.
-- `status` must be one of the retained statuses, including `tombstone` for soft-deleted issues.
+- `status` must be one of the retained statuses: `open`, `in_progress`, `in_review`, `human_review`, `blocked`, `deferred`, `closed`, or `tombstone` for soft-deleted issues.
 - Parent links and hierarchy paths should agree. Prefer `tl update <id> --parent <parent-id>` instead of moving files manually.
 - Same-issue edits on two Git branches can still conflict; resolve the JSON file like normal text.
 
@@ -178,10 +183,11 @@ Agents should interact through the CLI, not by editing JSON directly. Direct edi
 Recommended agent commands:
 
 ```bash
-tl ready --json
+tl ready --status open --unassigned --json
 tl show <id> --json
 tl create task "Title" --parent <epic-id> --description "..." --json
 tl update <id> --status in_progress --json
+tl update <id> --status in_review --json
 tl comments add <id> "Note" --json
 tl close <id> --reason "Done" --json
 ```

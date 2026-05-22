@@ -2,6 +2,7 @@ package file
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -381,6 +382,11 @@ func (m *issueIndex) UpdateIssue(ctx context.Context, id string, updates map[str
 	if !exists {
 		return fmt.Errorf("issue %s not found", id)
 	}
+	if status, hasStatus := updates["status"]; hasStatus {
+		if _, err := parseIssueStatusValue(status); err != nil {
+			return err
+		}
+	}
 
 	now := time.Now()
 	issue.UpdatedAt = now
@@ -424,7 +430,9 @@ func (m *issueIndex) applyIssueUpdateLocked(issue *types.Issue, id, key string, 
 	case "notes":
 		setStringField(value, &issue.Notes)
 	case "status":
-		setIssueStatus(issue, value, now)
+		if err := setIssueStatus(issue, value, now); err != nil {
+			return err
+		}
 	case "priority":
 		if v, ok := value.(int); ok {
 			issue.Priority = v
@@ -485,19 +493,35 @@ func setOptionalTimePointer(value interface{}, target **time.Time) {
 	}
 }
 
-func setIssueStatus(issue *types.Issue, value interface{}, now time.Time) {
-	v, ok := value.(string)
-	if !ok {
-		return
+func setIssueStatus(issue *types.Issue, value interface{}, now time.Time) error {
+	status, err := parseIssueStatusValue(value)
+	if err != nil {
+		return err
+	}
+	if status == "" {
+		return nil
 	}
 
 	oldStatus := issue.Status
-	issue.Status = types.Status(v)
+	issue.Status = status
 	if issue.Status == types.StatusClosed && oldStatus != types.StatusClosed {
 		issue.ClosedAt = &now
 	} else if issue.Status != types.StatusClosed && oldStatus == types.StatusClosed {
 		issue.ClosedAt = nil
 	}
+	return nil
+}
+
+func parseIssueStatusValue(value interface{}) (types.Status, error) {
+	v, ok := value.(string)
+	if !ok {
+		return "", nil
+	}
+	status := types.Status(v)
+	if !status.IsValid() {
+		return "", fmt.Errorf("invalid status: %s", status)
+	}
+	return status, nil
 }
 
 func (m *issueIndex) setExternalRefLocked(issue *types.Issue, id string, value interface{}) error {
@@ -929,7 +953,7 @@ func (m *issueIndex) GetDependencies(ctx context.Context, issueID string) ([]*ty
 	var results []*types.Issue
 	for _, dep := range m.dependencies[issueID] {
 		if issue, exists := m.issues[dep.DependsOnID]; exists {
-			issueCopy := *issue
+			issueCopy := copyIssueValue(issue)
 			results = append(results, &issueCopy)
 		} else if isExternalDependencyID(dep.DependsOnID) {
 			results = append(results, externalDependencyIssue(dep.DependsOnID))
@@ -949,7 +973,7 @@ func (m *issueIndex) GetDependents(ctx context.Context, issueID string) ([]*type
 		for _, dep := range deps {
 			if dep.DependsOnID == issueID {
 				if issue, exists := m.issues[id]; exists {
-					issueCopy := *issue
+					issueCopy := copyIssueValue(issue)
 					results = append(results, &issueCopy)
 				}
 				break
@@ -968,7 +992,7 @@ func (m *issueIndex) GetDependenciesWithMetadata(ctx context.Context, issueID st
 	var results []*types.IssueWithDependencyMetadata
 	for _, dep := range m.dependencies[issueID] {
 		if issue, exists := m.issues[dep.DependsOnID]; exists {
-			issueCopy := *issue
+			issueCopy := copyIssueValue(issue)
 			results = append(results, &types.IssueWithDependencyMetadata{
 				Issue:          issueCopy,
 				DependencyType: dep.Type,
@@ -995,7 +1019,7 @@ func (m *issueIndex) GetDependentsWithMetadata(ctx context.Context, issueID stri
 		for _, dep := range deps {
 			if dep.DependsOnID == issueID {
 				if issue, exists := m.issues[id]; exists {
-					issueCopy := *issue
+					issueCopy := copyIssueValue(issue)
 					results = append(results, &types.IssueWithDependencyMetadata{
 						Issue:          issueCopy,
 						DependencyType: dep.Type,
@@ -1137,7 +1161,7 @@ func (m *issueIndex) DetectCycles(ctx context.Context) ([][]*types.Issue, error)
 				seenCycles[key] = true
 				cycle := make([]*types.Issue, 0, len(cycleIDs))
 				for _, cycleID := range cycleIDs {
-					issueCopy := *m.issues[cycleID]
+					issueCopy := copyIssueValue(m.issues[cycleID])
 					cycle = append(cycle, &issueCopy)
 				}
 				cycles = append(cycles, cycle)
@@ -1165,7 +1189,7 @@ func (m *issueIndex) DetectCycles(ctx context.Context) ([][]*types.Issue, error)
 }
 
 func treeNodeFromIssue(issue *types.Issue, depth int, parentID string, truncated bool) *types.TreeNode {
-	issueCopy := *issue
+	issueCopy := copyIssueValue(issue)
 	return &types.TreeNode{
 		Issue:     issueCopy,
 		Depth:     depth,
@@ -1191,7 +1215,7 @@ type issueCopyOptions struct {
 }
 
 func (m *issueIndex) copyIssueLocked(issue *types.Issue, options issueCopyOptions) *types.Issue {
-	issueCopy := *issue
+	issueCopy := copyIssueValue(issue)
 	if options.dependencies {
 		if deps, ok := m.dependencies[issue.ID]; ok {
 			issueCopy.Dependencies = copyDependencies(deps)
@@ -1247,6 +1271,19 @@ func copyComments(comments []*types.Comment) []*types.Comment {
 		copied = append(copied, &commentCopy)
 	}
 	return copied
+}
+
+func copyIssueValue(issue *types.Issue) types.Issue {
+	issueCopy := *issue
+	issueCopy.AgentWF = copyRawMessage(issue.AgentWF)
+	return issueCopy
+}
+
+func copyRawMessage(value json.RawMessage) json.RawMessage {
+	if len(value) == 0 {
+		return nil
+	}
+	return append(json.RawMessage(nil), value...)
 }
 
 func copyEvents(events []*types.Event) []*types.Event {
@@ -1407,7 +1444,7 @@ func (m *issueIndex) GetIssuesByLabel(ctx context.Context, label string) ([]*typ
 		for _, l := range labels {
 			if l == label {
 				if issue, exists := m.issues[issueID]; exists {
-					issueCopy := *issue
+					issueCopy := copyIssueValue(issue)
 					results = append(results, &issueCopy)
 				}
 				break
@@ -1423,9 +1460,10 @@ func (m *issueIndex) GetReadyWork(ctx context.Context, filter types.WorkFilter) 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
+	now := time.Now()
 	results := make([]*types.Issue, 0)
 	for _, issue := range m.issues {
-		if m.matchesReadyWorkLocked(issue, filter) {
+		if m.matchesReadyWorkLocked(issue, filter, now) {
 			results = append(results, m.copyIssueLocked(issue, issueCopyOptions{
 				dependencies: true,
 				labels:       true,
@@ -1438,11 +1476,14 @@ func (m *issueIndex) GetReadyWork(ctx context.Context, filter types.WorkFilter) 
 	return limitIssueResults(results, filter.Limit), nil
 }
 
-func (m *issueIndex) matchesReadyWorkLocked(issue *types.Issue, filter types.WorkFilter) bool {
+func (m *issueIndex) matchesReadyWorkLocked(issue *types.Issue, filter types.WorkFilter, now time.Time) bool {
 	if issue.Pinned {
 		return false
 	}
 	if !matchesReadyStatus(issue, filter.Status) {
+		return false
+	}
+	if !matchesReadyDeferred(issue, filter, now) {
 		return false
 	}
 	if filter.Priority != nil && issue.Priority != *filter.Priority {
@@ -1462,9 +1503,20 @@ func (m *issueIndex) matchesReadyWorkLocked(issue *types.Issue, filter types.Wor
 
 func matchesReadyStatus(issue *types.Issue, status types.Status) bool {
 	if status != "" {
-		return issue.Status == status
+		return isReadyStatus(status) && issue.Status == status
 	}
-	return issue.Status == types.StatusOpen || issue.Status == types.StatusInProgress
+	return isReadyStatus(issue.Status)
+}
+
+func isReadyStatus(status types.Status) bool {
+	return status == types.StatusOpen || status == types.StatusInProgress
+}
+
+func matchesReadyDeferred(issue *types.Issue, filter types.WorkFilter, now time.Time) bool {
+	if filter.IncludeDeferred || issue.DeferUntil == nil {
+		return true
+	}
+	return !issue.DeferUntil.After(now)
 }
 
 func matchesReadyType(issue *types.Issue, issueType string) bool {
@@ -1538,7 +1590,7 @@ func sortReadyWorkResults(results []*types.Issue, sortPolicy types.SortPolicy) {
 	}
 }
 
-// getOpenBlockers returns the IDs of blockers that are currently open/in_progress/blocked/deferred.
+// getOpenBlockers returns the IDs of blockers that are not complete yet.
 // The caller must hold at least a read lock.
 func (m *issueIndex) getOpenBlockers(issueID string) []string {
 	deps := m.dependencies[issueID]
@@ -1558,7 +1610,12 @@ func (m *issueIndex) getOpenBlockers(issueID string) []string {
 			continue
 		}
 		switch blocker.Status {
-		case types.StatusOpen, types.StatusInProgress, types.StatusBlocked, types.StatusDeferred:
+		case types.StatusOpen,
+			types.StatusInProgress,
+			types.StatusInReview,
+			types.StatusHumanReview,
+			types.StatusBlocked,
+			types.StatusDeferred:
 			blockers = append(blockers, blocker.ID)
 		}
 	}
@@ -1603,7 +1660,7 @@ func (m *issueIndex) GetBlockedIssues(ctx context.Context, filter types.WorkFilt
 			continue
 		}
 
-		issueCopy := *issue
+		issueCopy := copyIssueValue(issue)
 		if deps, ok := m.dependencies[issue.ID]; ok {
 			issueCopy.Dependencies = copyDependencies(deps)
 		}
@@ -1688,7 +1745,7 @@ func (m *issueIndex) GetStaleIssues(ctx context.Context, filter types.StaleFilte
 			continue
 		}
 		if issue.UpdatedAt.Before(cutoff) {
-			issueCopy := *issue
+			issueCopy := copyIssueValue(issue)
 			stale = append(stale, &issueCopy)
 		}
 	}
@@ -1744,7 +1801,7 @@ func (m *issueIndex) GetNewlyUnblockedByClose(ctx context.Context, closedIssueID
 		// Check if now unblocked (no remaining open blockers)
 		blockers := m.getOpenBlockers(issueID)
 		if len(blockers) == 0 {
-			issueCopy := *issue
+			issueCopy := copyIssueValue(issue)
 			unblocked = append(unblocked, &issueCopy)
 		}
 	}
@@ -1836,6 +1893,10 @@ func (m *issueIndex) GetStatistics(ctx context.Context) (*types.Statistics, erro
 			stats.OpenIssues++
 		case types.StatusInProgress:
 			stats.InProgressIssues++
+		case types.StatusInReview:
+			stats.InReviewIssues++
+		case types.StatusHumanReview:
+			stats.HumanReviewIssues++
 		case types.StatusClosed:
 			stats.ClosedIssues++
 		case types.StatusDeferred:
@@ -1848,7 +1909,13 @@ func (m *issueIndex) GetStatistics(ctx context.Context) (*types.Statistics, erro
 	}
 
 	// TotalIssues excludes tombstones.
-	stats.TotalIssues = stats.OpenIssues + stats.InProgressIssues + stats.ClosedIssues + stats.DeferredIssues + stats.PinnedIssues
+	stats.TotalIssues = stats.OpenIssues +
+		stats.InProgressIssues +
+		stats.InReviewIssues +
+		stats.HumanReviewIssues +
+		stats.ClosedIssues +
+		stats.DeferredIssues +
+		stats.PinnedIssues
 
 	// Second pass: calculate blocked and ready issues based on dependencies
 	// An issue is blocked if it has open blockers (uses same logic as GetBlockedIssues)
@@ -1917,7 +1984,7 @@ func (m *issueIndex) epicStatusesLocked() []*types.EpicStatus {
 
 	statuses := make([]*types.EpicStatus, 0, len(epicIDs))
 	for _, epicID := range epicIDs {
-		epicCopy := *m.issues[epicID]
+		epicCopy := copyIssueValue(m.issues[epicID])
 		children := epicChildren[epicID]
 		sort.Strings(children)
 		closedChildren := 0

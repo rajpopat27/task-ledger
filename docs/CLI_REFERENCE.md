@@ -77,6 +77,7 @@ tl list
 tl list --all
 tl list --all --json
 tl list --all --status open
+tl list --all --status in_review
 tl list --all --priority P0
 tl list --all --assignee raj
 tl list --all --type task
@@ -150,6 +151,8 @@ Missing IDs exit non-zero. Legacy `--thread` and `--refs` are unsupported by the
 tl update tk-b841aa --title "New title"
 tl update tk-b841aa --type chore
 tl update tk-b841aa --status in_progress
+tl update tk-b841aa --status in_review
+tl update tk-b841aa --status human_review
 tl update tk-b841aa --priority P1
 tl update tk-b841aa --assignee raj
 tl update tk-b841aa --description-file desc.md
@@ -168,6 +171,8 @@ tl update tk-b841aa --set-labels final,backend
 tl update tk-b841aa --parent ep-other
 tl --actor raj update tk-b841aa --claim
 ```
+
+Built-in statuses are `open`, `in_progress`, `in_review`, `human_review`, `blocked`, `deferred`, and `closed`.
 
 `--claim` sets the assignee to the actor and moves the issue to `in_progress`. If the issue is already claimed, the command exits non-zero.
 
@@ -215,6 +220,7 @@ tl --json comments tk-b841aa
 ```bash
 tl ready
 tl ready --limit 10
+tl ready --status open
 tl ready --priority 0
 tl ready --assignee raj
 tl ready --unassigned

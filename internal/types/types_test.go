@@ -103,7 +103,17 @@ func TestSetDefaults(t *testing.T) {
 }
 
 func TestStatusAndIssueTypeValidity(t *testing.T) {
-	for _, status := range []Status{StatusOpen, StatusInProgress, StatusBlocked, StatusDeferred, StatusClosed, StatusTombstone, StatusPinned} {
+	for _, status := range []Status{
+		StatusOpen,
+		StatusInProgress,
+		StatusInReview,
+		StatusHumanReview,
+		StatusBlocked,
+		StatusDeferred,
+		StatusClosed,
+		StatusTombstone,
+		StatusPinned,
+	} {
 		if !status.IsValid() {
 			t.Fatalf("status %q should be valid", status)
 		}

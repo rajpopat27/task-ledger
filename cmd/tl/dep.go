@@ -358,7 +358,7 @@ Examples:
 			switch iss.Status {
 			case types.StatusOpen:
 				idStr = ui.StatusOpenStyle.Render(iss.ID)
-			case types.StatusInProgress:
+			case types.StatusInProgress, types.StatusInReview, types.StatusHumanReview:
 				idStr = ui.StatusInProgressStyle.Render(iss.ID)
 			case types.StatusBlocked:
 				idStr = ui.StatusBlockedStyle.Render(iss.ID)
@@ -610,7 +610,7 @@ func getStatusEmoji(status types.Status) string {
 	switch status {
 	case types.StatusOpen:
 		return "☐" // U+2610 Ballot Box
-	case types.StatusInProgress:
+	case types.StatusInProgress, types.StatusInReview, types.StatusHumanReview:
 		return "◧" // U+25E7 Square Left Half Black
 	case types.StatusBlocked:
 		return "⚠" // U+26A0 Warning Sign
@@ -746,7 +746,7 @@ func formatTreeNode(node *types.TreeNode) string {
 	switch node.Status {
 	case types.StatusOpen:
 		idStr = ui.StatusOpenStyle.Render(node.ID)
-	case types.StatusInProgress:
+	case types.StatusInProgress, types.StatusInReview, types.StatusHumanReview:
 		idStr = ui.StatusInProgressStyle.Render(node.ID)
 	case types.StatusBlocked:
 		idStr = ui.StatusBlockedStyle.Render(node.ID)
@@ -909,7 +909,11 @@ func init() {
 	depTreeCmd.Flags().IntP("max-depth", "d", 50, "Maximum tree depth to display (safety limit)")
 	depTreeCmd.Flags().Bool("reverse", false, "Show dependent tree (alias for --direction=up)")
 	depTreeCmd.Flags().String("direction", "", "Tree direction: 'down' (dependencies), 'up' (dependents), or 'both'")
-	depTreeCmd.Flags().String("status", "", "Filter to only show issues with this status (open, in_progress, blocked, deferred, closed)")
+	depTreeCmd.Flags().String(
+		"status",
+		"",
+		"Filter to only show issues with this status (open, in_progress, in_review, human_review, blocked, deferred, closed)",
+	)
 	depTreeCmd.Flags().String("format", "", "Output format: 'mermaid' for Mermaid.js flowchart")
 	depTreeCmd.Flags().StringP("type", "t", "", "Filter to only show dependencies of this type (e.g., tracks, blocks, parent-child)")
 

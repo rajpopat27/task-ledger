@@ -54,11 +54,13 @@ type (
 
 // Status constants.
 const (
-	StatusOpen       = types.StatusOpen
-	StatusInProgress = types.StatusInProgress
-	StatusBlocked    = types.StatusBlocked
-	StatusDeferred   = types.StatusDeferred
-	StatusClosed     = types.StatusClosed
+	StatusOpen        = types.StatusOpen
+	StatusInProgress  = types.StatusInProgress
+	StatusInReview    = types.StatusInReview
+	StatusHumanReview = types.StatusHumanReview
+	StatusBlocked     = types.StatusBlocked
+	StatusDeferred    = types.StatusDeferred
+	StatusClosed      = types.StatusClosed
 )
 
 // IssueType constants.

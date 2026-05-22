@@ -198,17 +198,26 @@ func displayPrettyListWithDeps(issues []*types.Issue, showHeader bool, allDeps m
 	fmt.Println(strings.Repeat("-", 80))
 	openCount := 0
 	inProgressCount := 0
+	reviewCount := 0
 	for _, issue := range issues {
 		switch issue.Status {
 		case "open":
 			openCount++
 		case "in_progress":
 			inProgressCount++
+		case "in_review", "human_review":
+			reviewCount++
 		}
 	}
-	fmt.Printf("Total: %d issues (%d open, %d in progress)\n", len(issues), openCount, inProgressCount)
+	fmt.Printf(
+		"Total: %d issues (%d open, %d in progress, %d in review)\n",
+		len(issues),
+		openCount,
+		inProgressCount,
+		reviewCount,
+	)
 	fmt.Println()
-	fmt.Println("Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred")
+	fmt.Println("Status: ○ open  ◐ in_progress/in_review/human_review  ● blocked  ✓ closed  ❄ deferred")
 }
 
 // sortIssues sorts a slice of issues by the specified field and direction
@@ -623,7 +632,12 @@ var listCmd = &cobra.Command{
 }
 
 func init() {
-	listCmd.Flags().StringP("status", "s", "", "Filter by status (open, in_progress, blocked, deferred, closed)")
+	listCmd.Flags().StringP(
+		"status",
+		"s",
+		"",
+		"Filter by status (open, in_progress, in_review, human_review, blocked, deferred, closed)",
+	)
 	registerPriorityFlag(listCmd, "")
 	listCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	listCmd.Flags().StringP("type", "t", "", "Filter by type (feature_request, feature, epic, task, bug, chore)")
@@ -721,7 +735,7 @@ func outputDotFormat(ctx context.Context, store storage.Storage, issues []*types
 		case "closed":
 			fillColor = "lightgray"
 			fontColor = "dimgray"
-		case "in_progress":
+		case "in_progress", "in_review", "human_review":
 			fillColor = "lightyellow"
 		case "blocked":
 			fillColor = "lightcoral"

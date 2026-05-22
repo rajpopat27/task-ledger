@@ -797,6 +797,13 @@ func TestIssueIndex_UpdateIssue_SearchIssues_ReadyWork_BlockedIssues(t *testing.
 	if reopened.ClosedAt != nil {
 		t.Fatalf("expected ClosedAt cleared")
 	}
+	if err := store.UpdateIssue(ctx, child.ID, map[string]interface{}{"status": "bogus"}, "actor"); err == nil {
+		t.Fatalf("expected invalid status error")
+	}
+	reopened, _ = store.GetIssue(ctx, child.ID)
+	if reopened.Status != types.StatusOpen {
+		t.Fatalf("invalid status update changed status to %s", reopened.Status)
+	}
 	if got, _ := store.GetIssueByExternalRef(ctx, "new-ext"); got != nil {
 		t.Fatalf("expected new-ext cleared")
 	}
@@ -879,6 +886,13 @@ func TestIssueIndex_UpdateIssue_SearchIssues_ReadyWork_BlockedIssues(t *testing.
 	}
 	if len(ready) != 1 || ready[0].ID != blocker.ID {
 		t.Fatalf("expected blocker only, got %+v", ready)
+	}
+	ready, err = store.GetReadyWork(ctx, types.WorkFilter{Status: types.StatusClosed})
+	if err != nil {
+		t.Fatalf("GetReadyWork closed status: %v", err)
+	}
+	if len(ready) != 0 {
+		t.Fatalf("closed issues should not be ready, got %+v", ready)
 	}
 
 	// Label filters.
