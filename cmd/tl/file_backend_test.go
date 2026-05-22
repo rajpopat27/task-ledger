@@ -184,6 +184,7 @@ func TestFileBackendRetainedCommandMatrix(t *testing.T) {
 	}
 	run("dep", "remove", task, blocker)
 	run("ready")
+	run("ready", "--status", "open")
 
 	run("close", blocker, "--reason", "fixed")
 	run("reopen", blocker, "--reason", "needs another pass")
@@ -520,6 +521,7 @@ func TestFileBackendExhaustiveRetainedFlagQA(t *testing.T) {
 
 	for _, args := range [][]string{
 		{"ready", "--limit", "5"},
+		{"ready", "--status", "open"},
 		{"ready", "--priority", "0"},
 		{"ready", "--assignee", "alice"},
 		{"ready", "--unassigned"},
@@ -632,6 +634,94 @@ func TestFileBackendDeleteReasonCreatesTombstone(t *testing.T) {
 	}
 	if _, ok := issue["deleted_at"]; !ok {
 		t.Fatalf("deleted_at missing from tombstone: %#v", issue)
+	}
+}
+
+func TestFileBackendPreservesAgentWFMetadata(t *testing.T) {
+	tmpBin := buildFileBackendBinary(t)
+	repo := t.TempDir()
+	run := func(args ...string) string {
+		t.Helper()
+		return runFileBackendTL(t, tmpBin, repo, args...)
+	}
+
+	run("init", "--quiet")
+	id := run("create", "task", "Agent task", "--silent")
+	issuePath := filepath.Join(repo, ".task-ledger", "issues", id, "issue.json")
+
+	var issue map[string]interface{}
+	readIssueJSON(t, issuePath, &issue)
+	issue["agentwf"] = map[string]interface{}{
+		"worker_agent_id": "coder",
+		"review_agent_ids": []interface{}{
+			"code-reviewer",
+			"security-reviewer",
+		},
+		"custom": map[string]interface{}{
+			"preserve": true,
+		},
+	}
+	data, err := json.MarshalIndent(issue, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal issue with agentwf: %v", err)
+	}
+	if err := os.WriteFile(issuePath, append(data, '\n'), 0o644); err != nil {
+		t.Fatalf("write issue with agentwf: %v", err)
+	}
+
+	run("update", id, "--status", "in_review")
+
+	readIssueJSON(t, issuePath, &issue)
+	if issue["status"] != "in_review" {
+		t.Fatalf("status = %#v, want in_review", issue["status"])
+	}
+	agentWF, ok := issue["agentwf"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("agentwf missing after update: %#v", issue)
+	}
+	if agentWF["worker_agent_id"] != "coder" {
+		t.Fatalf("worker_agent_id = %#v, want coder", agentWF["worker_agent_id"])
+	}
+	reviewers, ok := agentWF["review_agent_ids"].([]interface{})
+	if !ok || len(reviewers) != 2 {
+		t.Fatalf("review_agent_ids = %#v, want two reviewers", agentWF["review_agent_ids"])
+	}
+	custom, ok := agentWF["custom"].(map[string]interface{})
+	if !ok || custom["preserve"] != true {
+		t.Fatalf("custom metadata was not preserved: %#v", agentWF["custom"])
+	}
+}
+
+func TestFileBackendReadyStatusFilter(t *testing.T) {
+	tmpBin := buildFileBackendBinary(t)
+	repo := t.TempDir()
+	run := func(args ...string) string {
+		t.Helper()
+		return runFileBackendTL(t, tmpBin, repo, args...)
+	}
+
+	run("init", "--quiet")
+	openID := run("create", "task", "Open task", "--silent")
+	inProgressID := run("create", "task", "In progress task", "--silent")
+	run("update", inProgressID, "--status", "in_progress")
+
+	out := run("--json", "ready", "--status", "open", "--limit", "50")
+	var issues []map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &issues); err != nil {
+		t.Fatalf("ready JSON did not parse: %v\n%s", err, out)
+	}
+
+	seen := map[string]bool{}
+	for _, issue := range issues {
+		if id, ok := issue["id"].(string); ok {
+			seen[id] = true
+		}
+	}
+	if !seen[openID] {
+		t.Fatalf("ready --status open did not include open issue %s: %#v", openID, issues)
+	}
+	if seen[inProgressID] {
+		t.Fatalf("ready --status open included in_progress issue %s: %#v", inProgressID, issues)
 	}
 }
 

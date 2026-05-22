@@ -1,6 +1,7 @@
 package file
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 	"time"
@@ -11,6 +12,9 @@ import (
 func TestFileIssueRoundTrip(t *testing.T) {
 	now := time.Date(2026, 4, 30, 10, 11, 12, 0, time.UTC)
 	externalRef := "gh-42"
+	agentWF := json.RawMessage(
+		`{"worker_agent_id":"coder","review_agent_ids":["code-reviewer","security-reviewer"],"extra":{"preserve":true}}`,
+	)
 	issue := &types.Issue{
 		ID:                 "tk-44de10",
 		Title:              "Add card field",
@@ -34,6 +38,7 @@ func TestFileIssueRoundTrip(t *testing.T) {
 		Comments: []*types.Comment{
 			{ID: 1, IssueID: "tk-44de10", Author: "agent", Text: "Looks scoped", CreatedAt: now},
 		},
+		AgentWF: agentWF,
 	}
 
 	fileIssue := FromTypesIssue(issue)
@@ -49,6 +54,9 @@ func TestFileIssueRoundTrip(t *testing.T) {
 	if len(fileIssue.Deps) != 1 || fileIssue.Deps[0] != "tk-11aa22" {
 		t.Fatalf("Deps = %#v, want blocking dep", fileIssue.Deps)
 	}
+	if string(fileIssue.AgentWF) != string(agentWF) {
+		t.Fatalf("AgentWF = %s, want %s", fileIssue.AgentWF, agentWF)
+	}
 
 	roundTrip, err := fileIssue.ToTypesIssue()
 	if err != nil {
@@ -59,6 +67,9 @@ func TestFileIssueRoundTrip(t *testing.T) {
 	}
 	if len(roundTrip.Dependencies) != 2 {
 		t.Fatalf("round trip dependencies = %d, want 2", len(roundTrip.Dependencies))
+	}
+	if string(roundTrip.AgentWF) != string(agentWF) {
+		t.Fatalf("round trip AgentWF = %s, want %s", roundTrip.AgentWF, agentWF)
 	}
 }
 

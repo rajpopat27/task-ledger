@@ -13,10 +13,11 @@ import (
 
 var readyCmd = &cobra.Command{
 	Use:   "ready",
-	Short: "Show ready work (no blockers, open or in_progress)",
-	Long:  `Show ready work: issues with no open blockers that are open or in_progress.`,
+	Short: "Show ready work (no blockers)",
+	Long:  `Show ready work: issues with no open blockers. By default, this includes open or in_progress issues.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		limit, _ := cmd.Flags().GetInt("limit")
+		status, _ := cmd.Flags().GetString("status")
 		assignee, _ := cmd.Flags().GetString("assignee")
 		unassigned, _ := cmd.Flags().GetBool("unassigned")
 		sortPolicy, _ := cmd.Flags().GetString("sort")
@@ -41,7 +42,6 @@ var readyCmd = &cobra.Command{
 		}
 
 		filter := types.WorkFilter{
-			// Leave Status empty to get both 'open' and 'in_progress'
 			Type:            issueType,
 			Limit:           limit,
 			Unassigned:      unassigned,
@@ -49,6 +49,9 @@ var readyCmd = &cobra.Command{
 			Labels:          labels,
 			LabelsAny:       labelsAny,
 			IncludeDeferred: includeDeferred, // GH#820: respect --include-deferred flag
+		}
+		if status != "" {
+			filter.Status = types.Status(status)
 		}
 		// Use Changed() to properly handle P0 (priority=0)
 		if cmd.Flags().Changed("priority") {
@@ -162,6 +165,11 @@ var blockedCmd = &cobra.Command{
 
 func init() {
 	readyCmd.Flags().IntP("limit", "n", 10, "Maximum issues to show")
+	readyCmd.Flags().String(
+		"status",
+		"",
+		"Filter by status (open, in_progress, in_review, human_review, blocked, deferred, closed)",
+	)
 	readyCmd.Flags().IntP("priority", "p", 0, "Filter by priority")
 	readyCmd.Flags().StringP("assignee", "a", "", "Filter by assignee")
 	readyCmd.Flags().BoolP("unassigned", "u", false, "Show only unassigned issues")

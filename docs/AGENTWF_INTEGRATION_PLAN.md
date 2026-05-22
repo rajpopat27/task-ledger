@@ -20,11 +20,11 @@ orchestrator:
 - `tl close <id> --reason ... --json` for completion
 - `tl dep add/remove/list` for dependency management
 
-## Required Changes
+## Required Task Ledger Changes
 
 ### 1. Preserve Orchestrator Metadata
 
-Add a structured `agentwf` object to the issue schema:
+Preserve an optional `agentwf` object in the issue schema:
 
 ```json
 {
@@ -44,9 +44,9 @@ Purpose:
 - `delivery_sha`: final delivered commit after human approval.
 - `feedback`: structured feedback records for the next worker run.
 
-The field must round-trip through all read/write commands. Unknown JSON fields are
-not enough because current typed read/write paths can drop fields when rewriting
-`issue.json`.
+Task Ledger should round-trip the object but not interpret its internal schema.
+Unknown top-level JSON fields are not enough because typed read/write paths can
+drop fields when rewriting `issue.json`.
 
 ### 2. Add Workflow Statuses
 
@@ -76,11 +76,12 @@ Expose a way to fetch only unclaimed open work:
 tl ready --status open --unassigned --json
 ```
 
-If adding `--status` to `ready` is not desired, the orchestrator adapter can
-filter `tl ready --json` results itself. The important contract is that worker
-pickup only starts from `status=open` and no assignee.
+The important contract is that worker pickup only starts from `status=open` and
+no assignee.
 
-### 4. Add Compare-And-Set Mutations
+## Deferred Task Ledger Changes
+
+### Compare-And-Set Mutations
 
 For safer orchestration, add optional expected-value flags to mutating commands:
 
@@ -97,9 +98,10 @@ Minimum useful expectations:
 - `--expect-updated-at` or a future issue revision field
 
 This keeps transitions deterministic when users or tools edit the same ticket
-between orchestrator reads and writes.
+between orchestrator reads and writes. It is not required for the first local
+adapter because `tl update --claim` already protects initial pickup.
 
-### 5. Add Safe Claim Clearing
+### Safe Claim Clearing
 
 Add a safe way to clear the orchestrator claim after delivery:
 
@@ -115,7 +117,7 @@ This prevents clearing a human or another agent's claim by accident.
 The orchestrator should use only this Task Ledger surface:
 
 ```text
-tl ready --json
+tl ready --status open --unassigned --json
 tl show <id> --json
 tl update <id> --claim --json
 tl update <id> --status <status> --json

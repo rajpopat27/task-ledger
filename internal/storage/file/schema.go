@@ -36,6 +36,7 @@ type FileIssue struct {
 	AcceptanceCriteria string              `json:"acceptance_criteria,omitempty"`
 	Notes              string              `json:"notes,omitempty"`
 	Comments           []*types.Comment    `json:"comments"`
+	AgentWF            json.RawMessage     `json:"agentwf,omitempty"`
 	CreatedAt          time.Time           `json:"created_at"`
 	CreatedBy          string              `json:"created_by,omitempty"`
 	UpdatedAt          time.Time           `json:"updated_at"`
@@ -110,6 +111,7 @@ func FromTypesIssue(issue *types.Issue) FileIssue {
 		AcceptanceCriteria: issue.AcceptanceCriteria,
 		Notes:              issue.Notes,
 		Comments:           cloneComments(issue.Comments),
+		AgentWF:            cloneRawMessage(issue.AgentWF),
 		CreatedAt:          issue.CreatedAt,
 		CreatedBy:          issue.CreatedBy,
 		UpdatedAt:          issue.UpdatedAt,
@@ -210,6 +212,7 @@ func (fi FileIssue) ToTypesIssue() (*types.Issue, error) {
 		Labels:             append([]string(nil), fi.Labels...),
 		Dependencies:       dependencies,
 		Comments:           cloneComments(fi.Comments),
+		AgentWF:            cloneRawMessage(fi.AgentWF),
 		DeletedAt:          fi.DeletedAt,
 		DeletedBy:          fi.DeletedBy,
 		DeleteReason:       fi.DeleteReason,
@@ -248,4 +251,11 @@ func cloneComments(comments []*types.Comment) []*types.Comment {
 		out = append(out, &commentCopy)
 	}
 	return out
+}
+
+func cloneRawMessage(value json.RawMessage) json.RawMessage {
+	if len(value) == 0 {
+		return nil
+	}
+	return append(json.RawMessage(nil), value...)
 }

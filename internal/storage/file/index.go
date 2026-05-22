@@ -2,6 +2,7 @@ package file
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -1192,6 +1193,7 @@ type issueCopyOptions struct {
 
 func (m *issueIndex) copyIssueLocked(issue *types.Issue, options issueCopyOptions) *types.Issue {
 	issueCopy := *issue
+	issueCopy.AgentWF = copyRawMessage(issue.AgentWF)
 	if options.dependencies {
 		if deps, ok := m.dependencies[issue.ID]; ok {
 			issueCopy.Dependencies = copyDependencies(deps)
@@ -1247,6 +1249,13 @@ func copyComments(comments []*types.Comment) []*types.Comment {
 		copied = append(copied, &commentCopy)
 	}
 	return copied
+}
+
+func copyRawMessage(value json.RawMessage) json.RawMessage {
+	if len(value) == 0 {
+		return nil
+	}
+	return append(json.RawMessage(nil), value...)
 }
 
 func copyEvents(events []*types.Event) []*types.Event {
@@ -1538,7 +1547,7 @@ func sortReadyWorkResults(results []*types.Issue, sortPolicy types.SortPolicy) {
 	}
 }
 
-// getOpenBlockers returns the IDs of blockers that are currently open/in_progress/blocked/deferred.
+// getOpenBlockers returns the IDs of blockers that are not complete yet.
 // The caller must hold at least a read lock.
 func (m *issueIndex) getOpenBlockers(issueID string) []string {
 	deps := m.dependencies[issueID]
@@ -1558,7 +1567,12 @@ func (m *issueIndex) getOpenBlockers(issueID string) []string {
 			continue
 		}
 		switch blocker.Status {
-		case types.StatusOpen, types.StatusInProgress, types.StatusBlocked, types.StatusDeferred:
+		case types.StatusOpen,
+			types.StatusInProgress,
+			types.StatusInReview,
+			types.StatusHumanReview,
+			types.StatusBlocked,
+			types.StatusDeferred:
 			blockers = append(blockers, blocker.ID)
 		}
 	}
@@ -1836,6 +1850,10 @@ func (m *issueIndex) GetStatistics(ctx context.Context) (*types.Statistics, erro
 			stats.OpenIssues++
 		case types.StatusInProgress:
 			stats.InProgressIssues++
+		case types.StatusInReview:
+			stats.InReviewIssues++
+		case types.StatusHumanReview:
+			stats.HumanReviewIssues++
 		case types.StatusClosed:
 			stats.ClosedIssues++
 		case types.StatusDeferred:
@@ -1848,7 +1866,13 @@ func (m *issueIndex) GetStatistics(ctx context.Context) (*types.Statistics, erro
 	}
 
 	// TotalIssues excludes tombstones.
-	stats.TotalIssues = stats.OpenIssues + stats.InProgressIssues + stats.ClosedIssues + stats.DeferredIssues + stats.PinnedIssues
+	stats.TotalIssues = stats.OpenIssues +
+		stats.InProgressIssues +
+		stats.InReviewIssues +
+		stats.HumanReviewIssues +
+		stats.ClosedIssues +
+		stats.DeferredIssues +
+		stats.PinnedIssues
 
 	// Second pass: calculate blocked and ready issues based on dependencies
 	// An issue is blocked if it has open blockers (uses same logic as GetBlockedIssues)

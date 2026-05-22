@@ -2,6 +2,7 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -38,9 +39,10 @@ type Issue struct {
 	ExternalRef  *string `json:"external_ref,omitempty"`
 	SourceSystem string  `json:"source_system,omitempty"`
 
-	Labels       []string      `json:"labels,omitempty"`
-	Dependencies []*Dependency `json:"dependencies,omitempty"`
-	Comments     []*Comment    `json:"comments,omitempty"`
+	Labels       []string        `json:"labels,omitempty"`
+	Dependencies []*Dependency   `json:"dependencies,omitempty"`
+	Comments     []*Comment      `json:"comments,omitempty"`
+	AgentWF      json.RawMessage `json:"agentwf,omitempty"`
 
 	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
 	DeletedBy    string     `json:"deleted_by,omitempty"`
@@ -147,19 +149,29 @@ func (i *Issue) SetDefaults() {
 type Status string
 
 const (
-	StatusOpen       Status = "open"
-	StatusInProgress Status = "in_progress"
-	StatusBlocked    Status = "blocked"
-	StatusDeferred   Status = "deferred"
-	StatusClosed     Status = "closed"
-	StatusTombstone  Status = "tombstone"
-	StatusPinned     Status = "pinned"
+	StatusOpen        Status = "open"
+	StatusInProgress  Status = "in_progress"
+	StatusInReview    Status = "in_review"
+	StatusHumanReview Status = "human_review"
+	StatusBlocked     Status = "blocked"
+	StatusDeferred    Status = "deferred"
+	StatusClosed      Status = "closed"
+	StatusTombstone   Status = "tombstone"
+	StatusPinned      Status = "pinned"
 )
 
 // IsValid checks if the status value is valid.
 func (s Status) IsValid() bool {
 	switch s {
-	case StatusOpen, StatusInProgress, StatusBlocked, StatusDeferred, StatusClosed, StatusTombstone, StatusPinned:
+	case StatusOpen,
+		StatusInProgress,
+		StatusInReview,
+		StatusHumanReview,
+		StatusBlocked,
+		StatusDeferred,
+		StatusClosed,
+		StatusTombstone,
+		StatusPinned:
 		return true
 	}
 	return false
@@ -417,6 +429,8 @@ type Statistics struct {
 	TotalIssues             int     `json:"total_issues"`
 	OpenIssues              int     `json:"open_issues"`
 	InProgressIssues        int     `json:"in_progress_issues"`
+	InReviewIssues          int     `json:"in_review_issues"`
+	HumanReviewIssues       int     `json:"human_review_issues"`
 	ClosedIssues            int     `json:"closed_issues"`
 	BlockedIssues           int     `json:"blocked_issues"`
 	DeferredIssues          int     `json:"deferred_issues"`
